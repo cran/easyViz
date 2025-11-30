@@ -22,7 +22,7 @@
 #'   \item {continuous}, predictions are shown for cross-sections at the 10th, 50th, and 90th percentiles.
 #'   \item {categorical}, a separate prediction line or point will be plotted for each level.
 #'   \item {used as a grouping variable} in a random effect term (e.g., \code{(1|group)} or \code{s(group, bs = "re")})
-#'         and \code{re.form = NULL}, predictions are conditional on each group's estimated random effect.
+#'         and \code{re_form = NULL}, predictions are conditional on each group's estimated random effect.
 #' }
 #' Although \code{easyViz} does not natively support direct visualization of three-way interactions in a multi-panel plot,
 #' this can be easily achieved by combining the \code{by} and \code{fix_values} arguments.
@@ -62,7 +62,7 @@
 #' conditioning means holding these variables constant while varying the predictor of interest.
 #' If multiple levels are equally frequent when \code{"mode"} is selected, the level chosen will be the first in the factor's level order 
 #' (which by default is alphabetical and typically coincides with the reference level, unless explicitly re-leveled).
-#' This behavior also applies to grouping variables used as random effects when \code{re.form = NULL}.
+#' This behavior also applies to grouping variables used as random effects when \code{re_form = NULL}.
 #' To fix categorical variables (including grouping variables) at specific levels, use \code{fix_values}.
 #' @param fix_values A named vector or named list specifying fixed values for one or more variables during prediction.
 #' Supports both numeric and categorical variables.
@@ -70,7 +70,7 @@
 #' For categorical variables (factors), provide the desired level as a character string or factor 
 #' (e.g., \code{fix_values = c(group = "levelA")} or \code{fix_values = list(group = levels(data$group)[1])}).
 #' This overrides the default conditioning behavior specified via \code{num_conditioning} and \code{cat_conditioning}.
-#' \strong{Note:} This argument also applies to grouping variables used as random effects: when \code{re.form = NULL}, 
+#' \strong{Note:} This argument also applies to grouping variables used as random effects: when \code{re_form = NULL}, 
 #' predictions are conditional on the level specified in \code{fix_values}; 
 #' if not specified, the level is chosen based on \code{cat_conditioning}.
 #' This argument is useful for setting offsets, forcing predictions at specific values, or ensuring consistent conditioning across models.
@@ -83,24 +83,24 @@
 #' without plotting multiple lines or groups as \code{by} would.
 #' This argument can also be used to visualize three-way interactions when combined with \code{by}.
 #' See the \code{by} argument for details, and the Examples section for a demonstration of how to apply this approach.
-#' @param re.form A formula specifying which random effects to include when generating predictions.
+#' @param re_form A formula specifying which random effects to include when generating predictions.
 #' This argument is relevant for mixed-effects models only (e.g., from \code{lme4}, \code{glmmTMB}, or \code{mgcv::gam()}).
 #' \itemize{
-#'   \item {\code{re.form = NULL} (default):} produces group-specific predictions, conditional on the random-effect levels present in the data.
+#'   \item {\code{re_form = NULL} (default):} produces group-specific predictions, conditional on the random-effect levels present in the data.
 #'         By default, \code{easyViz} fixes grouping variables at their mode (i.e., the most frequent level), so the prediction reflects the 
 #'         conditional estimate for that group. You can override this by explicitly fixing the grouping variable via \code{fix_values} 
 #'         (e.g., \code{fix_values = c(group = "levelA")}). If all levels are equally frequent and no value is specified, the first level
 #'         (in factor order) is used, which is usually alphabetical unless re-leveled. If \code{by} corresponds to a grouping variable used 
 #'         in a random effect, predictions are visualized for all group levels (i.e., conditional predictions).
-#'   \item {\code{re.form = NA} or \code{re.form = ~0}:} produces population-level (i.e., marginal) predictions by excluding random effects from the prediction step.
+#'   \item {\code{re_form = NA} or \code{re_form = ~0}:} produces population-level (i.e., marginal) predictions by excluding random effects from the prediction step.
 #'         The random effects are still part of the fitted model and influence the estimation of fixed effects and their uncertainty,
 #'         but they are not included when computing predicted values. This is equivalent to assuming random effects are zero —
 #'         representing an "average" group or subject.
 #' }
 #' For \code{mgcv::gam()} models, random effects are typically modeled using smooth terms like \code{s(group, bs = "re")}.
 #' Although \code{predict.gam()} does not support a \code{re.form} argument, \code{easyViz} emulates its behavior:
-#' \code{re.form = NULL} includes random-effect smooths, while \code{re.form = NA} or \code{~0} excludes them via the \code{exclude} argument in \code{predict.gam()}.
-#' \strong{Note:} For models fitted with \code{lme4} (e.g., \code{lmer()}, \code{glmer()}), standard errors are not available when \code{re.form = NULL}.
+#' \code{re_form = NULL} includes random-effect smooths, while \code{re_form = NA} or \code{~0} excludes them via the \code{exclude} argument in \code{predict.gam()}.
+#' \strong{Note:} For models fitted with \code{lme4} (e.g., \code{lmer()}, \code{glmer()}), standard errors are not available when \code{re_form = NULL}.
 #' @param backtransform_response A custom function to back-transform predictions for transformed response variables 
 #' (e.g., \code{exp} for log-transformed responses, or \code{function(x) x^2} for square root-transformed responses).
 #' \strong{Note:} If you wish to model a transformed response, it is recommended to apply the transformation 
@@ -175,25 +175,27 @@
 #' Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) when multiple lines are plotted (i.e., when \code{by} is specified).
 #' @param pred_line_lwd Width of the predicted line for numerical predictors (default: \code{2}). 
 #' Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) when multiple lines are plotted (i.e., when \code{by} is specified).
-#' @param ci_type Type of 95 percent confidence intervals for numeric predictors. 
+#' @param ci_level Confidence level for the intervals (between 0 and 1). Defaults to \code{0.95}. 
+#' For example, \code{ci_level = 0.80} plots 80 percent confidence intervals.
+#' @param ci_type Type of confidence intervals for numeric predictors. 
 #' Either \code{"polygon"} (default) to draw shaded confidence bands, \code{"lines"} to draw lines, 
 #' or \code{NULL} to suppress confidence intervals for numeric predictors. 
 #' \strong{Note:} \code{ci_type = NULL} does \emph{not} suppress confidence bars for categorical predictors; 
 #' these are always shown unless manually suppressed via custom logic (e.g., by setting \code{ci_bar_lwd = 0}).
-#' @param ci_polygon_col Color for 95 percent confidence interval polygon (default: \code{"gray"}). 
+#' @param ci_polygon_col Color for confidence interval polygon (default: \code{"gray"}). 
 #' Requires \code{ci_type = "polygon"}. Can be specified as a color name, number or RGB/hex string. 
 #' Dynamic: accepts multiple values (e.g., \code{c("red", "green", "blue")}) 
-#' when 95 percent CIs are plotted for multiple lines (i.e., when \code{by} is specified).
-#' @param ci_line_col Color for 95 percent confidence interval lines (default: \code{"black"}). 
+#' when CIs are plotted for multiple lines (i.e., when \code{by} is specified).
+#' @param ci_line_col Color for confidence interval lines (default: \code{"black"}). 
 #' Requires \code{ci_type = "lines"}. Can be specified as a color name, number or RGB/hex string. 
 #' Dynamic: accepts multiple values (e.g., \code{c("red", "green", "blue")}) 
-#' when 95 percent CIs are plotted for multiple lines (i.e., when \code{by} is specified).
-#' @param ci_line_lty Type for 95 percent confidence interval lines (default: \code{1}). 
+#' when CIs are plotted for multiple lines (i.e., when \code{by} is specified).
+#' @param ci_line_lty Type for confidence interval lines (default: \code{1}). 
 #' Requires \code{ci_type = "lines"}. Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) 
-#' when 95 percent CIs are plotted for multiple lines (i.e., when \code{by} is specified).
-#' @param ci_line_lwd Width for 95 percent confidence interval lines (default: \code{1}). 
+#' when CIs are plotted for multiple lines (i.e., when \code{by} is specified).
+#' @param ci_line_lwd Width for confidence interval lines (default: \code{1}). 
 #' Requires \code{ci_type = "lines"}. Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) 
-#' when 95 percent CIs are plotted for multiple lines (i.e., when \code{by} is specified).
+#' when CIs are plotted for multiple lines (i.e., when \code{by} is specified).
 #' @param pred_point_col Color for predicted point values of categorical predictors (default: \code{"black"}). 
 #' Can be specified as a color name, number or RGB/hex string. 
 #' Dynamic: accepts multiple values (e.g., \code{c("red", "green", "blue")}) when points are plotted for an interaction (i.e., when \code{by} is specified).
@@ -201,12 +203,12 @@
 #' Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) when points are plotted for an interaction (i.e., when \code{by} is specified).
 #' @param pred_point_cex Size for predicted point values of categorical predictors (default: \code{1}). 
 #' Dynamic: accepts multiple values (e.g., \code{c(1, 2, 3)}) when points are plotted for an interaction (i.e., when \code{by} is specified).
-#' @param ci_bar_col Color for 95 percent confidence interval bars (default: \code{"black"}). 
+#' @param ci_bar_col Color for confidence interval bars (default: \code{"black"}). 
 #' Applies only when the predictor is categorical. Can be specified as a color name, number, or RGB/hex string. 
-#' @param ci_bar_lty Type for 95 percent confidence interval bars (default: \code{1}). Applies only when the predictor is categorical.
-#' @param ci_bar_lwd Width for 95 percent confidence interval bars (default: \code{1}). Applies only when the predictor is categorical.
+#' @param ci_bar_lty Type for confidence interval bars (default: \code{1}). Applies only when the predictor is categorical.
+#' @param ci_bar_lwd Width for confidence interval bars (default: \code{1}). Applies only when the predictor is categorical.
 #' To suppress confidence interval bars, set \code{ci_bar_lwd = 0} (line width of zero).
-#' @param ci_bar_caps Size of the caps on 95 percent confidence interval bars (default: \code{0.1}).
+#' @param ci_bar_caps Size of the caps on confidence interval bars (default: \code{0.1}).
 #' Increase for more visible caps, set to 0 to remove caps and draw plain vertical bars.
 #' @param add_legend Logical. Whether to add a legend for \code{by} variable levels (default: \code{FALSE}).
 #' @param legend_position Legend position. Either a named position string (\code{"top"}, \code{"bottom"}, \code{"left"}, 
@@ -251,11 +253,14 @@
 #' you must call \code{legend()} manually \emph{after} \code{easyViz()} to place it correctly.
 #' Use \code{legend_args} only for legends drawn \emph{inside} the plot area.
 #' 
-#' @return A base R plot visualizing the conditional effect of a predictor on the response variable.
-#' Additionally, a data frame is invisibly returned containing the predictor values, conditioning variables, 
-#' predicted values (\code{fit}), and their 95 percent confidence intervals (\code{lower}, \code{upper}).
+#' @return A base R plot visualizing the conditional effect of a predictor on the
+#' response variable. Additionally, a data frame is invisibly returned containing
+#' the predictor values, conditioning variables, predicted values (\code{Fit}),
+#' and lower and upper confidence limits. The confidence interval columns are
+#' labeled according to the specified level (e.g., \code{95LCL} and \code{95UCL}
+#' for \code{ci_level = 0.95}).
 #' To extract prediction data for further use (e.g., custom plotting or tabulation), assign the output to an object:
-#' \code{pred_df <- easyViz(...)}. You can then inspect it using \code{head(pred_df)} or save it with \code{write.csv(pred_df, ...)}.
+#' \code{pred.df <- easyViz(...)}. You can then inspect it using \code{head(pred.df)} or save it with \code{write.csv(pred.df, ...)}.
 #' 
 #' @details
 #' This function provides an easy-to-use yet highly flexible tool for visualizing conditional effects 
@@ -334,14 +339,14 @@
 #' offset_var <- log(runif(n, 1, 10))
 #' 
 #' # Assemble dataset
-#' sim_data <- data.frame(x1, x2, x3, x4, group, y, binary_y, y1, y2, y3, count_y, offset_var)
+#' sim.data <- data.frame(x1, x2, x3, x4, group, y, binary_y, y1, y2, y3, count_y, offset_var)
 #' 
 #' #------------------------------------------
 #' # 1. Linear model (lm)
 #' #------------------------------------------
-#' mod_lm <- lm(y ~ x1 + x4, 
-#'              data = sim_data)
-#' easyViz(model = mod_lm, data = sim_data, predictor = "x1", 
+#' mod.lm <- lm(y ~ x1 + x4, 
+#'              data = sim.data)
+#' easyViz(model = mod.lm, data = sim.data, predictor = "x1", 
 #'         by = "x4",
 #'         pred_range_limit = FALSE,
 #'         pred_on_top = TRUE,
@@ -349,8 +354,8 @@
 #'         ylim = c(-12,18),
 #'         xlab = "Predictor x1", 
 #'         ylab = "Response y",
-#'         point_col = ifelse(sim_data$x4=="a", "red", 
-#'                            ifelse(sim_data$x4=="b", "orange", 
+#'         point_col = ifelse(sim.data$x4=="a", "red", 
+#'                            ifelse(sim.data$x4=="b", "orange", 
 #'                                   "yellow")),
 #'         point_cex = 0.5,
 #'         pred_line_col = c("red", "orange", "yellow"),
@@ -365,35 +370,36 @@
 #'         legend_horiz = TRUE,
 #'         legend_args = list(pch = 16))
 #' 
-#' mod_lm2 <- lm(sqrt(x3) ~ x1 * x4, 
-#'               data = sim_data)
-#' easyViz(model = mod_lm2, data = sim_data, predictor = "x1", 
+#' mod.lm2 <- lm(sqrt(x3) ~ x1 * x4, 
+#'               data = sim.data)
+#' easyViz(model = mod.lm2, data = sim.data, predictor = "x1", 
 #'         by="x4",
 #'         backtransform_response = function(x) x^2,
 #'         ylim = c(0,8),
 #'         show_data_points = FALSE,
 #'         add_legend = TRUE)
 #' 
-#' mod_lm3 <- lm(y ~ poly(x3, 3), 
-#'               data = sim_data)
-#' easyViz(model = mod_lm3, data = sim_data, predictor = "x3", 
+#' mod.lm3 <- lm(y ~ poly(x3, 3), 
+#'               data = sim.data)
+#' easyViz(model = mod.lm3, data = sim.data, predictor = "x3", 
 #'         pred_on_top = TRUE,
 #'         font_family = "mono",
 #'         point_col = rgb(1,0,0,0.3),
 #'         point_pch = "+",
+#'         ci_level = 0.8,
 #'         ci_type = "lines",
 #'         ci_line_lty = 2)
 #' 
 #' # Extract prediction data
-#' pred_df <- easyViz(model = mod_lm, data = sim_data, predictor = "x1", by = "x4")
-#' head(pred_df)
+#' pred.df <- easyViz(model = mod.lm, data = sim.data, predictor = "x1", by = "x4", ci_level = 0.8)
+#' head(pred.df)
 #' 
 #' #------------------------------------------
 #' # 2. Robust linear model (rlm)
 #' #------------------------------------------
-#' mod_rlm <- rlm(y ~ x1 + x4, 
-#'                data = sim_data)
-#' easyViz(model = mod_rlm, data = sim_data, predictor = "x1", 
+#' mod.rlm <- rlm(y ~ x1 + x4, 
+#'                data = sim.data)
+#' easyViz(model = mod.rlm, data = sim.data, predictor = "x1", 
 #'         by = "x4",
 #'         pred_on_top = TRUE,
 #'         bty = "n",
@@ -401,8 +407,8 @@
 #'         xlab = "", # temporarily remove x-axis label
 #'         ylab = "Response y",
 #'         plot_args = list(xaxp=c(-2, 2, 4)), # set tick marks
-#'         point_col = ifelse(sim_data$x4=="a", "red", 
-#'                            ifelse(sim_data$x4=="b", "orange", 
+#'         point_col = ifelse(sim.data$x4=="a", "red", 
+#'                            ifelse(sim.data$x4=="b", "orange", 
 #'                                   "yellow")),
 #'         point_cex = 0.5,
 #'         pred_line_col = c("red", "orange", "yellow"),
@@ -423,10 +429,10 @@
 #' #------------------------------------------
 #' # 3. Generalized least squares (gls)
 #' #------------------------------------------
-#' mod_gls <- gls(y ~ x1 + x2 + x4, 
+#' mod.gls <- gls(y ~ x1 + x2 + x4, 
 #'                correlation = corAR1(form = ~1|group), 
-#'                data = sim_data)
-#' easyViz(model = mod_gls, data = sim_data, predictor = "x4",
+#'                data = sim.data)
+#' easyViz(model = mod.gls, data = sim.data, predictor = "x4",
 #'         jitter_data_points = TRUE,
 #'         bty = "n",
 #'         xlab = "Predictor x4", 
@@ -435,11 +441,11 @@
 #'         pred_point_col = "blue",
 #'         cat_labels = c("group A", "group B", "group C"))
 #' 
-#' sim_data$x5 <- sample(c(rep("CatA", 50), rep("CatB", 50)))
-#' mod_gls2 <- gls(y ~ x1 + x2 + x4 * x5, 
+#' sim.data$x5 <- sample(c(rep("CatA", 50), rep("CatB", 50)))
+#' mod.gls2 <- gls(y ~ x1 + x2 + x4 * x5, 
 #'                 correlation = corAR1(form = ~1|group), 
-#'                 data = sim_data)
-#' easyViz(model = mod_gls2, data = sim_data, predictor = "x4",
+#'                 data = sim.data)
+#' easyViz(model = mod.gls2, data = sim.data, predictor = "x4",
 #'         by = "x5",
 #'         jitter_data_points = TRUE,
 #'         bty = "n",
@@ -464,11 +470,11 @@
 #' #------------------------------------------
 #' # 4. Nonlinear least squares (nls)
 #' #------------------------------------------
-#' mod_nls <- nls(y ~ a * sin(b * x3) + c,
-#'                data = sim_data,
+#' mod.nls <- nls(y ~ a * sin(b * x3) + c,
+#'                data = sim.data,
 #'                start = list(a = 5, b = 1, c = 0))
-#' summary(mod_nls)
-#' easyViz(model = mod_nls, data = sim_data, predictor = "x3",
+#' summary(mod.nls)
+#' easyViz(model = mod.nls, data = sim.data, predictor = "x3",
 #'         pred_on_top = TRUE,
 #'         font_family = "serif",
 #'         bty = "n",
@@ -486,10 +492,10 @@
 #' #------------------------------------------
 #' # 5. Generalized linear model (glm)
 #' #------------------------------------------
-#' mod_glm <- glm(binary_y ~ x1 + x4 + offset(log(offset_var)), 
+#' mod.glm <- glm(binary_y ~ x1 + x4 + offset(log(offset_var)), 
 #'                family = binomial(link="cloglog"),
-#'                data = sim_data)
-#' easyViz(model = mod_glm, data = sim_data, predictor = "x1",
+#'                data = sim.data)
+#' easyViz(model = mod.glm, data = sim.data, predictor = "x1",
 #'         fix_values = list(x4="b", offset_var=1),
 #'         xlab = "Predictor x1", 
 #'         ylab = "Response y",
@@ -497,7 +503,7 @@
 #'         point_col = "black",
 #'         ci_polygon_col = "red")
 #' 
-#' easyViz(model = mod_glm, data = sim_data, predictor = "x4",
+#' easyViz(model = mod.glm, data = sim.data, predictor = "x4",
 #'         bty = "n",
 #'         xlab = "Predictor x4", 
 #'         ylab = "Response y",
@@ -507,10 +513,10 @@
 #'         point_pch = "|",
 #'         point_cex = 0.5)
 #' 
-#' mod_glm2 <- glm(y1/y3 ~ x1 + x4, weights = y3, 
+#' mod.glm2 <- glm(y1/y3 ~ x1 + x4, weights = y3, 
 #'                 family = binomial(link="logit"), 
-#'                 data = sim_data)
-#' easyViz(model = mod_glm2, data = sim_data, predictor = "x1",
+#'                 data = sim.data)
+#' easyViz(model = mod.glm2, data = sim.data, predictor = "x1",
 #'         pred_on_top = TRUE,
 #'         xlab = "Predictor x1", 
 #'         ylab = "Response y",
@@ -520,9 +526,9 @@
 #' #------------------------------------------
 #' # 6. Negative binomial GLM (glm.nb)
 #' #------------------------------------------
-#' mod_glm_nb <- glm.nb(count_y ~ x2, 
-#'                      data = sim_data)
-#' easyViz(model = mod_glm_nb, data = sim_data, predictor = "x2",
+#' mod.glm.nb <- glm.nb(count_y ~ x2, 
+#'                      data = sim.data)
+#' easyViz(model = mod.glm.nb, data = sim.data, predictor = "x2",
 #'         font_family = "mono",
 #'         bty = "L",
 #'         plot_args = list(main = "NB model"),
@@ -533,14 +539,14 @@
 #' #------------------------------------------
 #' # 7. Linear mixed-effects model (lmer)
 #' #------------------------------------------
-#' mod_lmer <- lmer(y ~ x1 + x4 + (1 | group), 
-#'                  data = sim_data)
-#' easyViz(model = mod_lmer, data = sim_data, predictor = "x1", 
+#' mod.lmer <- lmer(y ~ x1 + x4 + (1 | group), 
+#'                  data = sim.data)
+#' easyViz(model = mod.lmer, data = sim.data, predictor = "x1", 
 #'         by="group",
-#'         re.form = NULL,
+#'         re_form = NULL,
 #'         bty = "n",
-#'         plot_args = list(xaxp = c(round(min(sim_data$x1),1),
-#'                                   round(max(sim_data$x1),1), 5)),
+#'         plot_args = list(xaxp = c(round(min(sim.data$x1),1),
+#'                                   round(max(sim.data$x1),1), 5)),
 #'         ylim = c(-15, 15),
 #'         xlab = "Predictor x1", 
 #'         ylab = "Response y",
@@ -548,11 +554,11 @@
 #'         pred_line_lty = 1,
 #'         pred_line_lwd = 1)
 #' oldpar <- par(new = TRUE)
-#' easyViz(model = mod_lmer, data = sim_data, predictor = "x1",
-#'         re.form = NA,
+#' easyViz(model = mod.lmer, data = sim.data, predictor = "x1",
+#'         re_form = NA,
 #'         bty = "n",
-#'         plot_args = list(xaxp = c(round(min(sim_data$x1),1),
-#'                                   round(max(sim_data$x1),1), 5)),
+#'         plot_args = list(xaxp = c(round(min(sim.data$x1),1),
+#'                                   round(max(sim.data$x1),1), 5)),
 #'         show_data_points = FALSE,
 #'         xlab = "Predictor x1", 
 #'         ylab = "Response y",
@@ -566,12 +572,12 @@
 #' #------------------------------------------
 #' # 8. Generalized linear mixed model (glmer)
 #' #------------------------------------------
-#' mod_glmer <- glmer(binary_y ~ x1 + x4 + (1 | group), 
+#' mod.glmer <- glmer(binary_y ~ x1 + x4 + (1 | group), 
 #'                    family = binomial,
-#'                    data = sim_data)
-#' easyViz(model = mod_glmer, data = sim_data, predictor = "x1", 
+#'                    data = sim.data)
+#' easyViz(model = mod.glmer, data = sim.data, predictor = "x1", 
 #'         by = "group",
-#'         re.form = NULL,
+#'         re_form = NULL,
 #'         cat_conditioning = "reference",
 #'         font_family = "serif",
 #'         xlab = "Predictor x1", 
@@ -585,10 +591,10 @@
 #' #------------------------------------------
 #' # 9. GLMM with negative binomial (glmer.nb)
 #' #------------------------------------------
-#' mod_glmer_nb <- glmer.nb(count_y ~ x2 + x4 + (1 | group), 
-#'                          data = sim_data)
-#' easyViz(model = mod_glmer_nb, data = sim_data, predictor = "x2",
-#'         re.form = NA,
+#' mod.glmer.nb <- glmer.nb(count_y ~ x2 + x4 + (1 | group), 
+#'                          data = sim.data)
+#' easyViz(model = mod.glmer.nb, data = sim.data, predictor = "x2",
+#'         re_form = NA,
 #'         bty = "n",
 #'         xlab = "Predictor x2", 
 #'         ylab = "Response y",
@@ -598,12 +604,12 @@
 #' #------------------------------------------
 #' # 10. GLMM using glmmTMB
 #' #------------------------------------------
-#' mod_glmmTMB <- glmmTMB(count_y ~ x2 + x4 + (1 | group),
+#' mod.glmmTMB <- glmmTMB(count_y ~ x2 + x4 + (1 | group),
 #'                        ziformula = ~ x2, 
 #'                        family = nbinom2,
-#'                        data = sim_data)
-#' easyViz(model = mod_glmmTMB, data = sim_data, predictor = "x2",
-#'         re.form = NA,
+#'                        data = sim.data)
+#' easyViz(model = mod.glmmTMB, data = sim.data, predictor = "x2",
+#'         re_form = NA,
 #'         bty = "n",
 #'         xlab = "Predictor x2", 
 #'         ylab = "Response y",
@@ -614,23 +620,24 @@
 #' #------------------------------------------
 #' # 11. GAM with random smooth for group
 #' #------------------------------------------
-#' mod_gam <- gam(y ~ s(x3) + s(group, bs = "re"),
-#'                data = sim_data)
-#' easyViz(model = mod_gam, data = sim_data, predictor = "x3",
-#'         re.form = NA,
+#' mod.gam <- gam(y ~ s(x3) + s(group, bs = "re"),
+#'                data = sim.data)
+#' easyViz(model = mod.gam, data = sim.data, predictor = "x3",
+#'         re_form = NA,
 #'         las = 0,
 #'         bty = "n",
 #'         xlab = "Predictor x3", 
 #'         ylab = "Response y",
 #'         point_col = "black",
 #'         point_pch = 1,
+#'         ci_level = 0.99,
 #'         ci_polygon_col = rgb(1,0,0,0.5))
 #'         
 #' #------------------------------------------
 #' # 12. Plotting 3-way interaction
 #' #------------------------------------------
-#' mod_lm_int <- lm(y ~ x1*x2*x3, 
-#'                  data = sim_data)
+#' mod.lm.int <- lm(y ~ x1*x2*x3, 
+#'                  data = sim.data)
 #' 
 #' # Check conditional values to use for plotting
 #' quantile(x2, c(0.1,0.5, 0.9))
@@ -661,7 +668,7 @@
 #' old_mar <- par(mar = c(0, 0, 2, 0))
 #' 
 #' # Panel 1
-#' easyViz(model = mod_lm_int, data = sim_data, predictor = "x1", 
+#' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1", 
 #'         by = "x2",
 #'         fix_values = c(x3 = 0.5750978),
 #'         plot_args = list(xlab = "", ylab = ""),
@@ -675,7 +682,7 @@
 #' mtext("Response y", side = 2, outer = TRUE, line = 2.5)
 #' 
 #' # Panel 2
-#' easyViz(model = mod_lm_int, data = sim_data, predictor = "x1", 
+#' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1", 
 #'         by = "x2",
 #'         fix_values = c(x3 = 2.3095046),
 #'         plot_args = list(yaxt = "n", xlab = "", ylab = ""),
@@ -685,7 +692,7 @@
 #' add_strip_label("x3 = 2.3")
 #' 
 #' # Panel 3
-#' easyViz(model = mod_lm_int, data = sim_data, predictor = "x1", 
+#' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1", 
 #'         by = "x2",
 #'         fix_values = c(x3 = 4.4509078),
 #'         plot_args = list(yaxt = "n", xlab = "", ylab = ""),
@@ -719,7 +726,7 @@ easyViz <- function(model,
                     num_conditioning = "median",
                     cat_conditioning = "mode",
                     fix_values = NULL,
-                    re.form = NULL,
+                    re_form = NULL,
                     backtransform_response = NULL,
                     xlim = NULL, 
                     ylim = NULL,
@@ -740,6 +747,7 @@ easyViz <- function(model,
                     pred_line_col = "black", 
                     pred_line_lty = c(1,2,3,4), 
                     pred_line_lwd = 2,
+                    ci_level = 0.95,
                     ci_type = "polygon",
                     ci_polygon_col = c("gray", "black", "lightgray", "darkgray"),
                     ci_line_col = "black", 
@@ -1221,10 +1229,10 @@ as offset(%s).", paste(offset_vars, collapse = ", "), deparse(offset_expr)
   
   # Default: no term excluded
   exclude_terms <- NULL
-  # Determine if re.form indicates exclusion of random-effect smooths in mgcv::gam
+  # Determine if re_form indicates exclusion of random-effect smooths in mgcv::gam
   exclude_re_smooths <- (
-    isTRUE(all.equal(re.form, NA)) ||
-      (inherits(re.form, "formula") && deparse(re.form) == "~0")
+    isTRUE(all.equal(re_form, NA)) ||
+      (inherits(re_form, "formula") && deparse(re_form) == "~0")
   )
   # For mgcv::gam models, emulate re.form = NA by excluding re smooths
   if (is_gam_model && exclude_re_smooths) {
@@ -1239,17 +1247,17 @@ as offset(%s).", paste(offset_vars, collapse = ", "), deparse(offset_expr)
     }
   }
   
-  # Predict with or without re.form depending on model class
-  if (is_lme4_model && is.null(re.form)) {
+  # Predict with or without re_form depending on model class
+  if (is_lme4_model && is.null(re_form)) {
     # lme4 + subject-specific predictions: no SEs
-    pred_fit <- predict(model, newdata = new_data, type = "link", re.form = re.form)
+    pred_fit <- predict(model, newdata = new_data, type = "link", re.form = re_form)
     preds_link <- list(fit = pred_fit, se.fit = rep(NA, length(pred_fit)))
     message("Note: Standard errors are not available for 
-lme4 models when re.form = NULL.")
+lme4 models when re_form = NULL.")
     
   } else if (is_lme4_model || is_glmmTMB_model) {
-    # Models that support re.form and se.fit
-    preds_link <- predict(model, newdata = new_data, se.fit = TRUE, type = "link", re.form = re.form)
+    # Models that support re_form and se.fit
+    preds_link <- predict(model, newdata = new_data, se.fit = TRUE, type = "link", re.form = re_form)
     
   } else if (is_gam_model) {
     preds_link <- predict(model, newdata = new_data, se.fit = TRUE, type = "link",
@@ -1384,10 +1392,17 @@ and intervals may be underestimated.")
   # Calculate link-scale confidence intervals
   link_fit <- preds_link$fit
   link_se <- preds_link$se.fit
+  
   # Calculate t-based CIs only for models where inference is not asymptotic
   # and finite-sample correction is appropriate
   #	Uses fallback logic (nobs - k) only for those models — ensuring robustness
-  # Defaults to 1.96 for everything else — including GLMs, GAMs, and mixed models
+  # Defaults to normal-based quantiles determined by `ci_level` (e.g., 1.96 only when ci_level = 0.95)
+  # for everything  else — including GLMs, GAMs, and mixed models
+
+  if (!is.numeric(ci_level) || ci_level <= 0 || ci_level >= 1)
+    stop("ci_level must be between 0 and 1.")
+  
+  alpha <- (1 + ci_level) / 2
   crit <- tryCatch({
     if (inherits(model, c("lm", "rlm", "gls", "nls")) &&
         !inherits(model, c("glm", "gam", "glmerMod", "lmerMod", "glmmTMB"))) {
@@ -1406,15 +1421,15 @@ and intervals may be underestimated.")
       }
       
       if (!is.na(df) && is.finite(df) && df > 0) {
-        qt(0.975, df)
+        qt(alpha, df)
       } else {
-        qnorm(0.975)
+        qnorm(alpha)
       }
       
     } else {
-      qnorm(0.975)
+      qnorm(alpha)
     }
-  }, error = function(e) qnorm(0.975))
+  }, error = function(e) qnorm(alpha))
   link_lower <- link_fit - crit * link_se
   link_upper <- link_fit + crit * link_se
   
@@ -1877,16 +1892,18 @@ in the categorical predictor.")
   vars_to_include <- setdiff(used_terms, response_vars)
   
   # Build pred_df
+  ci_label_lower <- paste0(ci_level*100, "LCL")
+  ci_label_upper <- paste0(ci_level*100, "UCL")
   pred_df <- cbind(
     new_data[, intersect(vars_to_include, names(new_data)), drop = FALSE],
-    fit = preds$fit,
-    lower = preds$lower,
-    upper = preds$upper
+    Fit = preds$fit
   )
-  
+  pred_df[[ci_label_lower]] <- preds$lower
+  pred_df[[ci_label_upper]] <- preds$upper
+
   # Attach warning attribute if random effects were excluded
-  if (isTRUE(all.equal(re.form, NA)) || (inherits(re.form, "formula") && deparse(re.form) == "~0")) {
-    attr(pred_df, "re.form_warning") <- "When re.form = NA or ~0, grouping variables 
+  if (isTRUE(all.equal(re_form, NA)) || (inherits(re_form, "formula") && deparse(re_form) == "~0")) {
+    attr(pred_df, "re_form_warning") <- "When re_form = NA or ~0, grouping variables 
 (random effects) are ignored in predictions."
   }
   
@@ -1898,8 +1915,8 @@ in the categorical predictor.")
 
 #' @export
 print.easyviz_pred_df <- function(x, ...) {
-  if (!is.null(attr(x, "re.form_warning"))) {
-    warning(attr(x, "re.form_warning"), call. = FALSE)
+  if (!is.null(attr(x, "re_form_warning"))) {
+    warning(attr(x, "re_form_warning"), call. = FALSE)
   }
   NextMethod()  # fall back to default print.data.frame
 }

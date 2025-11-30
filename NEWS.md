@@ -1,3 +1,12 @@
+# easyViz 1.2.0
+- Renamed `re.form` to `re_form` for consistency with 
+  other arguments. Argument `re.form` is deprecated. 
+  Please use `re_form` instead.
+- Added `ci_level` argument to control the confidence interval level 
+  (default is 0.95). The confidence level used for the interval is 
+  included in the returned prediction data frame.
+- Documentation improvements.
+
 # easyViz 1.1.0
 - Added support for the new `pred_resolution` argument, which controls 
   the number of prediction points used for numeric predictors. 
@@ -41,3 +50,4 @@
 - Added an example demonstrating how to visualize 3-way interactions 
   using the `by` and `fix_values` arguments in a multi-panel layout.
 - Documentation improvements.
+
