@@ -90,23 +90,20 @@ Then construct '%s' using clean.data instead of the original data.",
 }
 
 # outer legend helpers
-# For single-panel plots: compute a point just above the plot region
+# For single- or multi-panel plots: compute a point just above the *current panel*
+# in USER coordinates (panel-specific).
 ez_out_top_xy <- function(offset_in = 0.08) {
-  plt <- graphics::par("plt")  # NDC: c(x1, x2, y1, y2)
+  usr <- graphics::par("usr")  # c(x1, x2, y1, y2) for the CURRENT panel
   
-  # centered over plot region (in NDC)
-  x_ndc <- mean(plt[1:2])
+  # center of current panel in user coords
+  x_usr <- mean(usr[1:2])
   
-  # convert a physical offset (inches) to NDC units
-  off_ndc <- graphics::grconvertY(offset_in, from = "inches", to = "ndc") -
-    graphics::grconvertY(0,        from = "inches", to = "ndc")
+  # convert physical offset (inches) to user coords for CURRENT panel
+  off_usr <- graphics::grconvertY(offset_in, from = "inches", to = "user") -
+    graphics::grconvertY(0,        from = "inches", to = "user")
   
-  # just above plot region
-  y_ndc <- plt[4] + off_ndc
-  
-  # NDC -> user coords for legend()
-  x_usr <- graphics::grconvertX(x_ndc, from = "ndc", to = "user")
-  y_usr <- graphics::grconvertY(y_ndc, from = "ndc", to = "user")
+  # just above the top of the current panel plot region (in user coords)
+  y_usr <- usr[4] + off_usr
   
   c(x = x_usr, y = y_usr)
 }

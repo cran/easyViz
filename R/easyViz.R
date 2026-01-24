@@ -11,7 +11,7 @@
 #'   \code{betareg::betareg}, \code{survival::coxph}, \code{lme4::lmer}, \code{lme4::glmer}, \code{lme4::glmer.nb}, \code{glmmTMB::glmmTMB}, and \code{mgcv::gam}.
 #' @param data [required] The data frame used to fit the model (e.g., \code{data = your.data}).
 #'   This data frame is used internally for generating predictions.
-#'   \emph{All variables used in the model formula (including predictors, offsets, grouping variables, and interaction terms) must be present in this data frame}.
+#'   \emph{All variables used in the model formula (including predictors, offset variables, grouping variables, and interaction terms) must be present in this data frame}.
 #'   If the model was fitted without using a \code{data} argument (e.g., using variables from the global environment),
 #'   you must ensure that \code{data} includes all required variables.
 #'   Otherwise, prediction may fail or produce incorrect results.
@@ -87,7 +87,7 @@
 #'   This argument also applies to \emph{grouping variables used as random effects}: when \code{re_form = NULL},
 #'   predictions are conditional on the level specified in \code{fix_values};
 #'   if not specified, the level is chosen based on \code{cat_conditioning}.
-#'   This argument is also useful for \emph{setting offsets}. For count models with a log link in which the offset is specified
+#'   This argument is also useful for \emph{setting offset variables}. For count models with a log link in which the offset is specified
 #'   as \code{offset(log(exposure))}, \code{easyViz} interprets the model as a rate model and, by default, fixes the exposure
 #'   variable to 1 in the prediction grid. Raw response values are correspondingly scaled by the exposure so that both data
 #'   points and predictions are displayed on the same unit-rate scale (e.g., detections per day; see \code{show_data_points} for more details).
@@ -456,10 +456,10 @@
 #' size <- 1.2
 #' count_y <- rnbinom(n, size = size, mu = mu_count)
 #' # Offset variable
-#' offset_var <- runif(n, 1, 10)
+#' exposure <- runif(n, 1, 10)
 #'
 #' # Assemble dataset
-#' sim.data <- data.frame(x1, x2, x3, x4, group, y, binary_y, y1, y2, y3, count_y, offset_var)
+#' sim.data <- data.frame(x1, x2, x3, x4, group, y, binary_y, y1, y2, y3, count_y, exposure)
 #'
 #' #------------------------------------------
 #' # 1. Linear model (lm)
@@ -610,11 +610,11 @@
 #' #------------------------------------------
 #' # 5. Generalized linear model (glm)
 #' #------------------------------------------
-#' mod.glm <- glm(binary_y ~ x1 + x4 + offset(log(offset_var)),
+#' mod.glm <- glm(binary_y ~ x1 + x4 + offset(log(exposure)),
 #'                family = binomial(link="cloglog"),
 #'                data = sim.data)
 #' easyViz(model = mod.glm, data = sim.data, predictor = "x1",
-#'         fix_values = list(x4="b", offset_var=1),
+#'         fix_values = list(x4="b", exposure=1),
 #'         xlab = "Predictor x1",
 #'         ylab = "Response y",
 #'         binary_data_type = "binned",
@@ -645,7 +645,7 @@
 #' #------------------------------------------
 #' # 6. Negative binomial GLM (glm.nb)
 #' #------------------------------------------
-#' mod.glm.nb <- glm.nb(count_y ~ x2 + offset(log(offset_var)),
+#' mod.glm.nb <- glm.nb(count_y ~ x2 + offset(log(exposure)),
 #'                      data = sim.data)
 #' easyViz(model = mod.glm.nb, data = sim.data, predictor = "x2",
 #'         font_family = "mono",
@@ -659,10 +659,10 @@
 #' # 7. Beta regression (betareg)
 #' #------------------------------------------
 #' sim.data$prop <- y1/y3
-#' mod.betareg <- betareg(prop ~ x1 * x4, offset = log(offset_var),
+#' mod.betareg <- betareg(prop ~ x1 * x4, offset = log(exposure),
 #'                        data = sim.data, link= "cloglog")
 #' easyViz(model = mod.betareg, data = sim.data, predictor = "x1",
-#'         fix_values = c(offset_var = 6),
+#'         fix_values = c(exposure = 6),
 #'         xlab = "Predictor x1",
 #'         ylab = "Response y",
 #'         ci_polygon_col = "forestgreen",
