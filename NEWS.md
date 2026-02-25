@@ -1,6 +1,11 @@
+# easyViz 2.0.2
+- Maintenance: updated internal handling of random-effects formulas to use
+  `reformulas::findbars()` following upstream changes in `lme4` and `glmmTMB`.
+  Added `reformulas` to Imports to prevent deprecation warnings.
+  
 # easyViz 2.0.1
 - Bug fix: the legend placement preset `legend_position = "out"` is now computed
-  per panel in multi-panel base graphics layouts (e.g., `par(mfrow=...)`,
+  per panel in multi-panel graphics layouts (e.g., `par(mfrow=...)`,
   `par(mfcol=...)`, `layout()`). Legends are consistently positioned above their relevant
   plot region rather than between panels.
 - Documentation: updated the examples to use `exposure` as the offset variable

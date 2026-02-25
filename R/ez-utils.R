@@ -246,13 +246,24 @@ ez_mode_factor <- function(x) {
 }
 
 # helper: extract grouping variables from ( ... | group ) terms
+ez_findbars <- function(f) {
+  if (requireNamespace("reformulas", quietly = TRUE)) {
+    return(reformulas::findbars(f))
+  }
+  # fallback for older installs
+  if (requireNamespace("lme4", quietly = TRUE)) {
+    return(lme4::findbars(f))
+  }
+  NULL
+}
+
 ez_extract_grouping_vars <- function(model) {
   f <- tryCatch(stats::formula(model), error = function(e) NULL)
   if (is.null(f)) return(character(0))
   
   # try lme4 parser if available (works for lme4 formulas and usually for glmmTMB too)
   if (requireNamespace("lme4", quietly = TRUE)) {
-    bars <- tryCatch(lme4::findbars(f), error = function(e) NULL)
+    bars <- tryCatch(ez_findbars(f), error = function(e) NULL)
     if (!is.null(bars) && length(bars) > 0) {
       grp <- unique(unlist(lapply(bars, function(b) all.vars(b[[3]]))))
       return(grp)
@@ -287,8 +298,7 @@ ez_has_random_effects <- function(model) {
   if (inherits(model, "glmmTMB")) {
     f <- tryCatch(stats::formula(model), error = function(e) NULL)
     if (is.null(f)) return(FALSE)
-    if (!requireNamespace("lme4", quietly = TRUE)) return(FALSE)
-    bars <- tryCatch(lme4::findbars(f), error = function(e) NULL)
+    bars <- tryCatch(ez_findbars(f), error = function(e) NULL)
     return(!is.null(bars) && length(bars) > 0)
   }
   

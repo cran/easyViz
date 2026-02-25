@@ -1,6 +1,6 @@
 Package: easyViz
 Title: Easy Visualization of Conditional Effects from Regression Models
-Version: 2.0.1
+Version: 2.0.2
 Authors@R: person("Luca", "Corlatti", role = c("aut", "cre"), email="lucac1980@yahoo.it")
 Description: Offers a flexible and user-friendly interface for visualizing conditional 
  effects from a broad range of regression models, including mixed-effects and generalized 
@@ -19,14 +19,14 @@ Description: Offers a flexible and user-friendly interface for visualizing condi
  Methods for generalized additive models using 'mgcv' follow Wood (2017)
  <doi:10.1201/9781315370279>.
 Maintainer: Luca Corlatti <lucac1980@yahoo.it>
-Imports: stats, utils, graphics, grDevices
+Imports: stats, utils, graphics, grDevices, reformulas
 Suggests: MASS, sandwich, nlme, numDeriv, betareg, statmod, survival,
         lme4, glmmTMB, mgcv
 License: GPL-3
 Encoding: UTF-8
 RoxygenNote: 7.3.3
 NeedsCompilation: no
-Packaged: 2026-01-24 13:29:39 UTC; lucacorlatti
+Packaged: 2026-02-25 20:58:34 UTC; lucacorlatti
 Author: Luca Corlatti [aut, cre]
 Repository: CRAN
-Date/Publication: 2026-01-24 15:00:02 UTC
+Date/Publication: 2026-02-25 21:20:20 UTC
