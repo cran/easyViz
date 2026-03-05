@@ -4,7 +4,8 @@ ez_build_output <- function(model,
                             new_data,
                             preds,
                             ci_level,
-                            re_form) {
+                            re_form,
+                            prep) {
   # Build a data frame with predicted values and 95 CIs (preds_df) cleanly with relevant predictors only
   # Extract variables from formula
   used_terms <- all.vars(formula(model))
@@ -14,7 +15,17 @@ ez_build_output <- function(model,
   response_vars <- all.vars(lhs_expr)
   # Assemble final variable list
   vars_to_include <- setdiff(used_terms, response_vars)
-  
+  # If random effects are excluded, drop grouping variables from output
+  # unless they are being used as predictor or by.
+  exclude_re <- identical(re_form, NA) ||
+    (inherits(re_form, "formula") &&
+       trimws(paste(deparse(re_form), collapse = " ")) %in% c("~0", "~ 0"))
+  if (exclude_re) {
+    grp_vars <- ez_extract_grouping_vars(model)
+    keep <- c(prep$predictor, prep$by %||% NULL)
+    drop_grp <- setdiff(grp_vars, keep)
+    vars_to_include <- setdiff(vars_to_include, drop_grp)
+  }
   # Build pred.df
   ci_label_lower <- paste0(ci_level * 100, "lcl")
   ci_label_upper <- paste0(ci_level * 100, "ucl")

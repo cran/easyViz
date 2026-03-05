@@ -21,7 +21,8 @@ ez_prepare_data <- function(model,
   
   # Warn for use of $ in the response variable
   if (ez_warn_on_env_prefix(lhs_expr)) {
-    message("Careful! Using `$` in model formulas can produce unexpected results. 
+    message(
+    "Careful! Using `$` in model formulas can produce unexpected results. 
 It is safer to specify the model using the `data` argument instead.")
   }
   
@@ -185,7 +186,8 @@ This is contradictory. Remove it from 'fix_values' to allow it to vary.")
   
   # by not in model?
   if (!is.null(by) && !(by %in% c(formula_vars, offset_vars))) {
-    message(sprintf("Heads up! The 'by' variable '%s' is not used in the model formula. 
+    message(sprintf(
+    "Heads up! The 'by' variable '%s' is not used in the model formula. 
 Grouping by it will not affect predictions. 
 Consider removing it from your easyViz() call.",
       by
@@ -293,7 +295,8 @@ plotting (%s / %s) * %g (rate scaled to exposure = %g).",
     
     # Show message only when raw data are plotted
     if (show_data_points) {
-      message("Note: the offset is not of the form log(exposure).
+      message(
+      "Note: the offset is not of the form log(exposure).
 easyViz will not rescale raw data or fix the exposure to 1 in predictions.
 For full control over scaling and exposure values, specify the offset as 
 log(exposure), using the exposure variable untransformed.")
@@ -346,11 +349,12 @@ likely due to all values being NA: ",
   # Warn if offset was passed outside of the formula (and we're using gam/lmer/glmer)
   if (offset_external) {
     offset_expr <- model_call$offset
-    message("Careful! The offset was specified outside the model formula.
+    message(
+    "Careful! The offset was specified outside the model formula.
 For gam() and glmer() models, such offsets are treated as offset = 0 
 during prediction (i.e., exposure = 1 in log-link count/rate models). 
 This matches easyViz's default behavior of plotting rates at exposure = 1, 
-but in this situation easyViz cannot vary the exposure level during prediction.
+but in this situation easyViz cannot vary the exposure level using fix_values.
 Use the offset in the formula (i.e., offset(log(exposure))) for full control.")
   }
   

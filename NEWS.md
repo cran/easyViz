@@ -1,3 +1,27 @@
+# easyViz 2.1.0
+- Breaking change: the `backtransform_response` argument has been replaced by
+  `pred_transform`, a generic hook to transform predicted values (and confidence
+  limits), whether computed on the link or response scale (as determined by `pred_type`).
+  Warnings are issued to clarify when the transformation is applied on the link
+  scale or after an inverse-link step (for models with non-identity links).
+- Maintenance: improved robustness of random-effects detection for mixed models.
+  Refined namespace checks for `lme4`, `glmmTMB`, and `reformulas` to ensure
+  optional dependency handling works correctly when suggested packages are
+  not installed.
+- Added internal fallback detection of grouping variables in mixed-model formulas
+  when optional parsing backends (`reformulas`, `lme4`) are not available.
+- Improved handling of random-effects conditioning in prediction summaries
+  and returned data frames. When `re_form = NA` (population-level predictions),
+  grouping variables used solely for random effects are no longer included
+  in the returned prediction data frame unless explicitly requested (e.g., via `by`).
+  In this case, a message is retained to clarify that random effects are excluded.
+- Improved handling of confidence intervals when standard errors are unavailable
+  (e.g., conditional predictions from mixed-effects models). In such cases,
+  confidence bounds are now returned as `NA` rather than producing invalid
+  or misleading values.
+- Improved and expanded examples.
+- Minor internal code clean-up and stability improvements.
+  
 # easyViz 2.0.2
 - Maintenance: updated internal handling of random-effects formulas to use
   `reformulas::findbars()` following upstream changes in `lme4` and `glmmTMB`.

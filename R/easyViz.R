@@ -27,7 +27,7 @@
 #'           \code{by} is treated as continuous and predictions are shown at representative values
 #'           (by default the 10th, 50th, and 90th percentiles), unless overridden by \code{by_breaks}.
 #'     \item Grouping variable in random effects:
-#'           if \code{by} corresponds to a variable used as a grouping term (as in, e.g., \code{(1|group)} or \code{s(group, bs="re")})
+#'           if \code{by} corresponds to a variable used as a grouping term (as in \code{(1|group)} or \code{s(group, bs="re")})
 #'           and \code{re_form = NULL}, predictions are conditional on group-specific random effects.
 #'   }
 #'   Although \code{easyViz} does not natively support direct visualization of three-way interactions in a multi-panel plot,
@@ -37,11 +37,10 @@
 #'   at a specific value using \code{fix_values = c(x3 = ...)}.
 #'   Repeating this with different values of \code{x3} produces multiple plots that can be arranged to visualize the full three-way interaction.
 #'   See the Examples section for a demonstration of how to apply this approach.
-#' @param by_breaks Optional numeric vector specifying the values of a numeric conditioning variable
-#'   to include in the plot (e.g., \code{by_breaks = c(-2, 0, 2)} or
-#'   \code{by_breaks = quantile(your.data$x2, c(0.25, 0.5, 0.75))}).
-#'   For numeric \code{by}, this selects the cross-sections to plot and overrides the default quantiles (0.1, 0.5, 0.9).
-#'   Ignored if \code{by} is categorical.
+#' @param by_breaks Optional numeric vector specifying the values of a numeric \code{by} variable to include 
+#'   in the plot (e.g., \code{by_breaks = c(-2, 0, 2)} or \code{by_breaks = quantile(your.data$x2, c(0.25, 0.5, 0.75))}).
+#'   If \code{by} is numeric, the values supplied in \code{by_breaks} define the cross-sections at which predictions 
+#'   are evaluated and override the default \code{by} conditioning behavior. Ignored when \code{by} is categorical.
 #' @param pred_type Character string indicating the type of predictions to plot.
 #'   Either \code{"response"} (default), which returns predictions on the original outcome scale
 #'   by applying the inverse of the model's link function (e.g., probabilities for binary models),
@@ -50,6 +49,34 @@
 #'   For \emph{survival models} (\code{coxph}), \code{pred_type = "link"} returns predictions 
 #'   on the linear predictor scale (log-hazard ratio), while \code{pred_type = "response"} returns hazard ratios.
 #'   Survival probabilities are not produced because they require a time point and the baseline hazard.
+#' @param pred_transform A user-supplied function to transform predicted values (including confidence limits). 
+#'   This argument is mainly intended for models where the response variable has been transformed directly 
+#'   in the model formula (e.g., \code{lm(sqrt(y) ~ x)} with \code{pred_transform = function(x) x^2}), 
+#'   in order to obtain predictions on the original response scale.
+#'   More generally, the transformation is applied to any predicted values, whether computed on the link or 
+#'   response scale (as determined by \code{pred_type}). If \code{pred_type = "link"}, the transformation is applied to 
+#'   predictions on the link scale and a warning is issued to make this explicit. If \code{pred_type = "response"} and the 
+#'   fitted model uses a non-identity link, the transformation is applied after the inverse-link step and a warning is issued 
+#'   to alert users to possible unintended double-transformations. \strong{Note:} Predicting on the link scale 
+#'   (i.e., \code{pred_type = "link"}) and then applying the model's inverse-link transformation
+#'   (e.g., log \eqn{\rightarrow} exp) via \code{pred_transform} is equivalent to requesting predictions 
+#'   on the response scale directly via \code{pred_type = "response"}. For this reason, using \code{pred_type = "response"} 
+#'   is usually more convenient than manually back-transforming link-scale predictions, and \code{pred_transform} is primarily
+#'   useful when the response variable itself has been transformed in the model formula.
+#'   Two exceptions deserve mention. First, a pedagogical use: \code{pred_transform} can be employed to demonstrate how link-scale
+#'   predictions map back to the response scale by requesting \code{pred_type = "link"} and then explicitly applying the model's
+#'   inverse-link transformation (e.g., \code{pred_transform = exp} for a log link). 
+#'   Second, \code{pred_transform} may be used to apply an additional, purely presentational transformation to predictions 
+#'   that are already on the response scale. For example, predicted probabilities from a binomial model can be converted 
+#'   into percentages using \code{pred_transform = function(x) 100 * x}. See the Examples section for illustrations.
+#'   \strong{Tip:} If you wish to model a transformed response, it is recommended to apply 
+#'   the transformation directly in the model formula (e.g., \code{log(y) ~ ...}), rather than modifying the response variable in
+#'   the data set. This ensures that observed data points are correctly plotted on the original (back-transformed) scale. 
+#'   Otherwise, raw data and predicted values may not align properly in the plot.
+#'   \strong{Lognormal models:} For log-transformed responses, recall that in lognormal models the expected value 
+#'   on the original scale is not simply \code{exp(x)} due to Jensen's inequality. If you want the expected value of a 
+#'   lognormal response, use a function such as \code{function(x) exp(x + sigma2/2)}, where \code{sigma2} is the residual
+#'   variance on the log scale (e.g., \code{sigma2 <- sigma(your.model)^2}).
 #' @param pred_range_limit Logical. Applies only when the predictor is numeric and a categorical \code{by} variable is specified.
 #'   If \code{TRUE} (default), the prediction range for each level of the \code{by} variable is limited to the range of the \code{predictor}
 #'   observed within that level. This avoids extrapolating predictions beyond the available data for each subgroup.
@@ -58,7 +85,7 @@
 #'   since numeric \code{by} values are treated as continuous rather than grouping factors.
 #' @param pred_on_top Logical. If \code{TRUE}, prediction lines (and their confidence intervals) for numeric predictors are drawn after raw data,
 #'   so they appear on top. Default is \code{FALSE}, which draws predictions underneath the data.
-#'   This has no effect for categorical predictors — for those, predictions are always drawn on top of raw data.
+#'   This has no effect for categorical predictors - for those, predictions are always drawn on top of raw data.
 #' @param pred_resolution Number of prediction points to use for numeric predictors.
 #'   Defaults to \code{101}, consistent with \code{visreg}.
 #'   The default should work well in most cases. Increasing \code{pred_resolution}
@@ -72,7 +99,7 @@
 #'   while varying the predictor of interest.
 #'   To fix specific variables at custom values instead, use the \code{fix_values} argument.
 #' @param cat_conditioning How to condition non-target categorical predictors.
-#'   Either \code{"mode"} (default) or \code{"reference"}. As for \code{"num_conditioning"},
+#'   Either \code{"mode"} (default) or \code{"reference"}. As for \code{num_conditioning},
 #'   conditioning means holding these variables constant while varying the predictor of interest.
 #'   If multiple levels are equally frequent when \code{"mode"} is selected, the level chosen will be the first in the factor's level order
 #'   (which by default is alphabetical and typically coincides with the reference level, unless explicitly re-leveled).
@@ -81,29 +108,32 @@
 #' @param fix_values A named vector or named list specifying fixed values for one or more variables during prediction.
 #'   Supports both numeric and categorical variables.
 #'   For numeric variables, specify a fixed value (e.g., \code{fix_values = c(x = 1)}).
-#'   For categorical variables, provide the desired level as a character string or factor (e.g., \code{fix_values = c(group = "levelA")}. 
+#'   For categorical variables, provide the desired level as a character string or factor (e.g., \code{fix_values = c(group = "levelA")}). 
 #'   Multiple values should be provided as a list (e.g., \code{fix_values = list(x = 1, group = "levelA")}).
 #'   This overrides the default conditioning behavior specified via \code{num_conditioning} and \code{cat_conditioning}.
-#'   This argument also applies to \emph{grouping variables used as random effects}: when \code{re_form = NULL},
-#'   predictions are conditional on the level specified in \code{fix_values};
+#'   \strong{Random effects:} When \code{re_form = NULL}, predictions are conditional on the level specified in \code{fix_values};
 #'   if not specified, the level is chosen based on \code{cat_conditioning}.
-#'   This argument is also useful for \emph{setting offset variables}. For count models with a log link in which the offset is specified
-#'   as \code{offset(log(exposure))}, \code{easyViz} interprets the model as a rate model and, by default, fixes the exposure
-#'   variable to 1 in the prediction grid. Raw response values are correspondingly scaled by the exposure so that both data
-#'   points and predictions are displayed on the same unit-rate scale (e.g., detections per day; see \code{show_data_points} for more details).
-#'   To obtain predictions on a different rate scale, fix the exposure at the desired value using \code{fix_values}.
-#'   If the offset is specified outside the model formula, for \code{gam()} and \code{glmer()} models
-#'   it is treated as \code{offset = 0} during prediction (i.e., exposure = 1 for log-link models).
-#'   This matches \code{easyViz}'s default behavior, but in such cases \code{easyViz} cannot vary the exposure.
+#'   \strong{Offset and rate models:} For count models with a log link in which the offset is specified
+#'   as \code{offset(log(exposure))}, \code{easyViz} interprets the model as a \emph{rate model} and, by default,
+#'   fixes the exposure variable to 1 in the prediction grid. Raw response values are correspondingly scaled
+#'   by the exposure so that both data points and predictions are displayed on the same unit-rate scale
+#'   (e.g., events per day; see also \code{show_data_points}).
+#'   To obtain predictions on a different rate scale, fix the exposure at the desired value
+#'   (e.g., \code{fix_values = c(exposure = 7)} for events per week).
+#'   For \code{gam()} and \code{glmer()} models, when the offset is specified outside the model formula,
+#'   it is not retained by the underlying \code{predict()} method and therefore defaults to
+#'   \code{offset = 0} during prediction (which corresponds to exposure = 1 for log-link models).
+#'   This matches \code{easyViz}'s default behavior, but in such cases \code{easyViz} \emph{cannot vary the exposure}
+#'   via \code{fix_values}, because the behavior is imposed by the model's prediction method.
 #'   Include the offset inside the formula (e.g., \code{offset(log(exposure))}) to enable full control.
-#'   If the default behavior is not desired (i.e., if you do not want automatic rate standardization or fixing exposure to 1),
-#'   you may still use an offset by specifying a pre-transformed exposure variable
+#'   If the default behavior is not desired (i.e., if you do not want automatic rate standardization
+#'   or fixing exposure to 1), you may instead use a pre-transformed exposure variable
 #'   (e.g., \code{log_exposure = log(exposure)} and \code{offset(log_exposure)}).
 #'   In this case, \code{easyViz} treats the offset as a generic additive term on the link scale.
 #'   Model predictions are computed correctly, but the offset variable is conditioned using the
-#'   default rules for numeric covariates (see \code{num_conditioning}) or values supplied via \code{fix_values}.
-#'   Because the exposure structure is no longer explicit, raw data are plotted on the original
-#'   response scale and no automatic rate standardization is applied.
+#'   default rules for numeric covariates (see \code{num_conditioning}) or values supplied via
+#'   \code{fix_values}. Because the exposure structure is no longer explicit, raw data are plotted
+#'   on the original response scale and no automatic rate standardization is applied.
 #'   \strong{Additional uses:} \code{fix_values} is useful also for forcing predictions at specific values or ensuring
 #'   consistent conditioning across models, for example when you want to visualize the effect of a predictor at
 #'   a specific level of an interacting variable, without conditioning on all levels.
@@ -124,8 +154,8 @@
 #'           in a random effect, predictions are visualized for all group levels (i.e., conditional predictions).
 #'     \item {\code{re_form = NA} or \code{re_form = ~0}:} produces population-level (i.e., marginal) predictions by excluding random effects from the prediction step.
 #'           The random effects are still part of the fitted model and influence the estimation of fixed effects and their uncertainty,
-#'           but they are not included when computing predicted values. This is equivalent to assuming random effects are zero —
-#'           representing an "average" group or subject.
+#'           but they are not included when computing predicted values. This is equivalent to assuming random effects are zero -
+#'           representing an 'average' group or subject.
 #'   }
 #'   This argument is relevant for mixed-effects models only (e.g., from \code{lme4}, \code{glmmTMB}, or \code{mgcv::gam()}).
 #'   For \code{mgcv::gam()} models, random effects can be modeled using smooth terms like \code{s(group, bs = "re")}.
@@ -138,16 +168,6 @@
 #'   \code{"HC4"}, \code{"HC4m"}, \code{"HC5"}, \code{"const"}, \code{"HC"}.
 #'   Alternatively, users may provide a covariance matrix (used directly), or
 #'   a function \code{f(model)} returning a covariance matrix. Default is \code{"HC0"}.
-#' @param backtransform_response A custom function to back-transform predictions for transformed response variables
-#'   (e.g., \code{exp} for log-transformed responses, or \code{function(x) x^2} for square root-transformed responses).
-#'   \strong{Note:} For log-transformed responses, recall that in lognormal models the mean on the original scale is
-#'   not simply \code{exp(x)} due to Jensen's inequality. If you want the expected value of a lognormal response, use
-#'   a function such as \code{function(x) exp(x + sigma2/2)}, where \code{sigma2} is the residual variance on the log scale
-#'   (e.g., \code{sigma2 <- sigma(your.model)^2}).
-#'   \strong{Note:} If you wish to model a transformed response, it is recommended to apply the transformation
-#'   directly in the model formula (e.g., \code{log(y) ~ ...}), rather than modifying the response variable in the data set.
-#'   This ensures that observed data points are correctly plotted on the original (back-transformed) scale.
-#'   Otherwise, raw data and predicted values may not align properly in the plot.
 #' @param xlim x-axis limits for the plot (e.g., \code{xlim = c(0, 10)}). Defaults to automatic scaling based on the data range.
 #'   Applies to both numeric and categorical predictors.
 #'   For categorical variables, x-axis positions are treated as integer values (e.g., 1, 2, ..., k),
@@ -187,15 +207,15 @@
 #'   For \emph{count models with a log link} that include an offset specified as
 #'   \code{offset(log(exposure))}, \code{easyViz} interprets the model as a rate model.
 #'   Raw response values are rescaled as \code{(count / exposure) * exposure_ref} and, by default,
-#'   \code{exposure_ref = 1}, so points are displayed on the unit-rate scale (e.g., detections per day).
+#'   \code{exposure_ref = 1}, so points are displayed on the unit-rate scale (e.g., events per day).
 #'   The prediction grid uses the same reference exposure value, ensuring that points and predictions
 #'   are on the same scale. To use a different rate scale, set the exposure reference value via
-#'   \code{fix_values} (e.g., \code{fix_values = c(exposure = 7)} for detections per 7 days).
+#'   \code{fix_values} (e.g., \code{fix_values = c(exposure = 7)} for events per week).
 #'   If this default behavior is not desired, the offset can instead be specified using a
 #'   pre-transformed exposure variable (e.g., \code{log_exposure = log(exposure)} and
 #'   \code{offset(log_exposure)} in the model formula). In this case, \code{easyViz} does not
 #'   apply automatic rate standardization and treats the offset as a generic additive term
-#'   on the link scale (see \code{fix_values} for details).
+#'   on the link scale (see also \code{fix_values}).
 #'   For \emph{survival models} (\code{coxph}), raw data points are not displayed, because
 #'   survival outcomes involve event times and censoring and are not directly
 #'   comparable to the plotted linear predictor (or hazard ratio) scale.
@@ -217,10 +237,10 @@
 #'   (via \code{by}). In this case, \code{point_col} must be either a single value
 #'   (applied to all points) or a vector of length equal to the number of observations
 #'   in the data supplied to \code{easyViz()} (e.g., generated via
-#'   \code{ifelse(group == "levelA", "blue", "red")} or similar logic; see the Example section).
+#'   \code{ifelse(group == "levelA", "blue", "red")} or similar logic; see the Examples section).
 #'   When the focal predictor is categorical and points are plotted for different
 #'   levels of a grouping variable (via \code{by}), \code{point_col} can be a vector of colors,
-#'   with one color per group (e.g., \code{point_col = c("blue", "red")}; see the Example section).\cr
+#'   with one color per group (e.g., \code{point_col = c("blue", "red")}; see the Examples section).\cr
 #'   \strong{Tip:} For large data sets with many overlapping data points,
 #'   it is recommended to use semi-transparent colors to reduce overplotting.
 #'   You can achieve this by setting a low alpha value (e.g., \code{rgb(1,0,0, alpha = 0.1}),
@@ -408,7 +428,7 @@
 #' #------------------------------------------
 #' # Load required packages
 #' #------------------------------------------
-#'
+#' 
 #' library(MASS)
 #' library(nlme)
 #' library(betareg)
@@ -416,7 +436,7 @@
 #' library(lme4)
 #' library(glmmTMB)
 #' library(mgcv)
-#'
+#' 
 #' #------------------------------------------
 #' # Simulate dataset
 #' #------------------------------------------
@@ -428,39 +448,39 @@
 #' x4 <- factor(sample(letters[1:3], n, replace = TRUE))
 #' group_levels <- paste0("G", 1:10)
 #' group <- factor(sample(group_levels, n, replace = TRUE))
-#'
+#' 
 #' # Generate random intercepts for each group
 #' group_effects <- rnorm(length(group_levels), mean = 0, sd = 2)  # non-zero variance
 #' names(group_effects) <- group_levels
 #' group_intercept <- group_effects[as.character(group)]
-#'
+#' 
 #' # Non-linear continuous response
 #' true_y <- 5 * sin(x3) + 3 * x1 + group_intercept + model.matrix(~x4)[, -1] %*% c(2, -2)
 #' noise <- rnorm(n, sd = 3)
 #' y <- as.vector(true_y + noise)
-#'
+#' 
 #' # Binary response with group effect added to logit
 #' logit_p <- 2 * x1 - 1 + group_intercept
 #' p <- 1 / (1 + exp(-logit_p))
 #' binary_y <- rbinom(n, size = 1, prob = p)
-#'
+#' 
 #' # Binomial response: number of successes and failures
 #' y3 <- sample(10:30, n, replace = TRUE)
 #' logit_p_prop <- -1.5 * scale(x1)
 #' p_prop <- 1 / (1 + exp(-logit_p_prop))
 #' y1 <- rbinom(n, size = y3, prob = p_prop) # successes
 #' y2 <- y3 - y1  # failures
-#'
+#' 
 #' # Count response with group effect in log(mu)
 #' mu_count <- exp(1 + 0.8 * x2 - 0.5 * (x4 == "b") + group_intercept)
 #' size <- 1.2
 #' count_y <- rnbinom(n, size = size, mu = mu_count)
 #' # Offset variable
 #' exposure <- runif(n, 1, 10)
-#'
+#' 
 #' # Assemble dataset
 #' sim.data <- data.frame(x1, x2, x3, x4, group, y, binary_y, y1, y2, y3, count_y, exposure)
-#'
+#' 
 #' #------------------------------------------
 #' # 1. Linear model (lm)
 #' #------------------------------------------
@@ -482,16 +502,20 @@
 #'         ci_polygon_col = c(rgb(1,0,0,0.5),
 #'                            rgb(1,0.5,0,0.5),
 #'                            rgb(1,1,0,0.5)))
-#'
+#' 
+#' # Numeric x categorical interaction
+#' # Backtransform response
+#' # Show conditioning summary
 #' mod.lm2 <- lm(sqrt(x3) ~ x1 * x4,
 #'               data = sim.data)
 #' easyViz(model = mod.lm2, data = sim.data, predictor = "x1",
 #'         by="x4",
-#'         backtransform_response = function(x) x^2,
+#'         pred_transform = function(x) x^2,
 #'         ylim = c(0,8),
 #'         show_data_points = FALSE,
 #'         show_conditioning = TRUE)
-#'
+#' 
+#' # Polynomial terms
 #' mod.lm3 <- lm(y ~ poly(x3, 3),
 #'               data = sim.data)
 #' easyViz(model = mod.lm3, data = sim.data, predictor = "x3",
@@ -502,17 +526,18 @@
 #'         ci_level = 0.85,
 #'         ci_type = "lines",
 #'         ci_line_lty = 2)
-#'
+#' 
 #' # Extract prediction data
-#' pred.df <- easyViz(model = mod.lm, data = sim.data, predictor = "x1",
-#'                    by = "x4", ci_level = 0.85, plot = FALSE)
-#' head(pred.df)
-#'
+#' df.mod.lm <- easyViz(model = mod.lm, data = sim.data, predictor = "x1",
+#'                      by = "x4", ci_level = 0.85, plot = FALSE)
+#' head(df.mod.lm)
+#' 
 #' #------------------------------------------
 #' # 2. Robust linear model (rlm)
 #' #------------------------------------------
 #' mod.rlm <- rlm(y ~ x1 + x4,
 #'                data = sim.data)
+#' # Add legend outside of plotting region
 #' old_xpd_mar <- par(xpd = TRUE, mar = c(5.1, 4.1, 4.1, 5.1))
 #' easyViz(model = mod.rlm, data = sim.data, predictor = "x1",
 #'         by = "x4",
@@ -533,17 +558,15 @@
 #'         legend_position = c(2.25,13),
 #'         legend_title = "Predictor x4",
 #'         legend_title_size = 0.9,
-#'         legend_args = list(legend = c("a", "b", "c",
-#'                                       "a", "b", "c"),
-#'                            col = c("red", "orange", "yellow",
-#'                                    "red", "orange", "yellow"),
-#'                            lty = c(1, 1, 1, NA, NA, NA), 
-#'                            lwd = c(2, 2, 2, NA, NA, NA), 
-#'                            pch = c(NA, NA, NA, 16, 16, 15), 
+#'         legend_args = list(legend = c("a", "b", "c"),
+#'                            col = c("red", "orange", "yellow"),
+#'                            lty = c(1, 1, 1), 
+#'                            lwd = c(2, 2, 2), 
+#'                            pch = c(16, 16, 16), 
 #'                            cex = 0.75,
 #'                            bty = "n"))
 #' par(old_xpd_mar)
-#'
+#' 
 #' #------------------------------------------
 #' # 3. Generalized least squares (gls)
 #' #------------------------------------------
@@ -558,7 +581,8 @@
 #'         point_col = rgb(0,0,1,0.2),
 #'         pred_point_col = "blue",
 #'         cat_labels = c("group A", "group B", "group C"))
-#'
+#' 
+#' # Categorical x categorical interaction & outer legend
 #' sim.data$x5 <- sample(c(rep("CatA", 50), rep("CatB", 50)))
 #' mod.gls2 <- gls(y ~ x1 + x2 + x4 * x5,
 #'                 correlation = corAR1(form = ~1|group),
@@ -567,7 +591,6 @@
 #' easyViz(model = mod.gls2, data = sim.data, predictor = "x4",
 #'         by = "x5",
 #'         jitter_data_points = TRUE,
-#'         bty = "n",
 #'         ylim = c(-15,15),
 #'         xlab = "Predictor x4",
 #'         ylab = "Response y",
@@ -576,15 +599,15 @@
 #'         pred_point_col = c("blue", "red"),
 #'         ci_bar_col = c("blue", "blue", "blue", "red", "red", "red"),
 #'         ci_bar_caps = 0,
-#'         legend_position = "topright",
-#'         legend_args = list(title = "Predictor x5",
+#'         legend_position = c(3.4, 15),
+#'         legend_args = list(title = "Pred x5",
 #'                            title.cex = 1,
 #'                            legend = c("A", "B"),
 #'                            pt.cex = 1.25,
 #'                            horiz = TRUE,
 #'                            inset = c(-0.2, 0)))
 #' par(old_xpd_mar)
-#'
+#' 
 #' #------------------------------------------
 #' # 4. Nonlinear least squares (nls)
 #' #------------------------------------------
@@ -606,7 +629,7 @@
 #' text(x = 2.5, y = 11,
 #'      labels = expression(Y %~% 5.31584 %*% sin(1.08158 %*% X[3]) + 0.51338),
 #'      cex = 0.7)
-#'
+#' 
 #' #------------------------------------------
 #' # 5. Generalized linear model (glm)
 #' #------------------------------------------
@@ -621,7 +644,8 @@
 #'         point_col = "black",
 #'         ci_polygon_col = "red",
 #'         ci_polygon_alpha = 1)
-#'
+#' 
+#' # Customize data points
 #' easyViz(model = mod.glm, data = sim.data, predictor = "x4",
 #'         bty = "n",
 #'         xlab = "Predictor x4",
@@ -631,7 +655,8 @@
 #'         point_col = "black",
 #'         point_pch = "|",
 #'         point_cex = 0.5)
-#'
+#' 
+#' # Binomial glm for proportion data
 #' mod.glm2 <- glm(y1/y3 ~ x1 + x4, weights = y3,
 #'                 family = binomial(link="logit"),
 #'                 data = sim.data)
@@ -641,7 +666,21 @@
 #'         ylab = "Response y",
 #'         point_col = "black",
 #'         ci_polygon_col = "red")
-#'
+#' 
+#' # Transform response predictions to percentage
+#' easyViz(model = mod.glm2, data = sim.data, predictor = "x1",
+#'         pred_transform = function(x) 100 * x,
+#'         pred_on_top = TRUE,
+#'         xlab = "Predictor x1",
+#'         ylab = "Response y",
+#'         show_data_points = FALSE,
+#'         point_col = "black",
+#'         ci_polygon_col = "red",
+#'         plot_args = list(yaxt = "n"))
+#' axis(2, at = pretty(par("usr")[3:4]),
+#'      labels = paste0(pretty(par("usr")[3:4]), "%"),
+#'      las = 1)
+#' 
 #' #------------------------------------------
 #' # 6. Negative binomial GLM (glm.nb)
 #' #------------------------------------------
@@ -654,7 +693,7 @@
 #'         xlab = "Predictor x2",
 #'         ylab = "Response y",
 #'         ci_polygon_col = "blue")
-#'
+#' 
 #' #------------------------------------------
 #' # 7. Beta regression (betareg)
 #' #------------------------------------------
@@ -667,7 +706,7 @@
 #'         ylab = "Response y",
 #'         ci_polygon_col = "forestgreen",
 #'         show_conditioning = TRUE)
-#'
+#' 
 #' #------------------------------------------
 #' # 8. Survival model (coxph)
 #' #------------------------------------------
@@ -678,12 +717,14 @@
 #'         ci_polygon_col = "orange2",
 #'         ci_polygon_alpha = 1,
 #'         show_conditioning = TRUE)
-#'         
+#' 
 #' #------------------------------------------
 #' # 9. Linear mixed model (lmer)
 #' #------------------------------------------
 #' mod.lmer <- lmer(y ~ x1 + x4 + (1 | group),
 #'                  data = sim.data)
+#' 
+#' # Random terms and population-level prediction
 #' easyViz(model = mod.lmer, data = sim.data, predictor = "x1",
 #'         by="group",
 #'         re_form = NULL,
@@ -712,13 +753,15 @@
 #'         pred_line_lwd = 2,
 #'         ci_type = NULL)
 #' par(old_new)
-#'
+#' 
 #' #------------------------------------------
 #' # 10. Generalized linear mixed model (glmer)
 #' #------------------------------------------
 #' mod.glmer <- glmer(binary_y ~ x1 + x4 + (1 | group),
 #'                    family = binomial,
 #'                    data = sim.data)
+#' 
+#' # Random terms
 #' easyViz(model = mod.glmer, data = sim.data, predictor = "x1",
 #'         by = "group",
 #'         re_form = NULL,
@@ -728,11 +771,17 @@
 #'         ylab = "Response y",
 #'         binary_data_type = "binned",
 #'         pred_range_limit = FALSE,
-#'         pred_line_col = "blue",
-#'         pred_line_lty = 1,
+#'         pred_line_col = 1:10,
+#'         pred_line_lty = 1:10,
 #'         pred_line_lwd = 1,
-#'         add_legend = FALSE)
-#'
+#'         legend_args = list(ncol = 5)) # adjust legend columns
+#' 
+#' # Extract prediction data & show conditioning summary
+#' df.mod.glmer <- easyViz(model = mod.glmer, data = sim.data, predictor = "x1",
+#'                         by = "group", re_form = NULL, cat_conditioning = "reference",
+#'                         show_conditioning = TRUE, plot = FALSE)
+#' head(df.mod.glmer)
+#' 
 #' #------------------------------------------
 #' # 11. GLMM with negative binomial (glmer.nb)
 #' #------------------------------------------
@@ -745,7 +794,7 @@
 #'         ylab = "Response y",
 #'         ylim = c(0, 120),
 #'         point_pch = 1)
-#'
+#' 
 #' #------------------------------------------
 #' # 12. GLMM (glmmTMB)
 #' #------------------------------------------
@@ -753,20 +802,25 @@
 #'                        ziformula = ~ x2,
 #'                        family = nbinom2,
 #'                        data = sim.data)
+#' 
+#' # Random terms with confidence bands
 #' easyViz(model = mod.glmmTMB, data = sim.data, predictor = "x2",
-#'         re_form = NA,
+#'         re_form = NULL, by= "group",
 #'         bty = "n",
 #'         xlab = "Predictor x2",
 #'         ylab = "Response y",
-#'         ylim = c(0, 120),
-#'         point_pch = 1,
-#'         ci_type = NULL)
-#'
+#'         show_data_points = FALSE,
+#'         pred_line_col = 1:10,
+#'         ci_polygon_col = 1:10,
+#'         legend_args = list(ncol = 5)) # adjust legend columns
+#' 
 #' #------------------------------------------
 #' # 13. GAM (mgcv::gam) with random smooth
 #' #------------------------------------------
 #' mod.gam <- gam(y ~ s(x3) + s(group, bs = "re"),
 #'                data = sim.data)
+#' 
+#' # Multiple confidence levels
 #' easyViz(model = mod.gam, data = sim.data, predictor = "x3",
 #'         re_form = NA,
 #'         las = 0,
@@ -810,17 +864,17 @@
 #' rect(3.5,7.5,4,8, col=adjustcolor("red", alpha.f = 0.5), border=FALSE)
 #' rect(3.5,6,4,6.5, col=adjustcolor("red", alpha.f = 1), border=FALSE)
 #' text(c(4.4, 4.4, 4.4), c(9.25, 7.75, 6.25), c("99% CI", "95% CI", "80% CI"), cex=0.75)
-#'
+#' 
 #' #------------------------------------------
 #' # 14. Plotting 3-way interaction
 #' #------------------------------------------
 #' mod.lm.int <- lm(y ~ x1 * x2 * x3,
 #'                  data = sim.data)
-#'
+#' 
 #' # Check conditional values to use for plotting
 #' quantile(x2, c(0.1,0.5, 0.9))
 #' quantile(x3, c(0.1,0.5, 0.9))
-#'
+#' 
 #' # (optional) Generate a customizable function to add a strip label at the top
 #' add_strip_label <- function(label, bg = "grey90", cex = 1, font = 2, height_mult = 2.5) {
 #'   usr <- par("usr")
@@ -839,12 +893,12 @@
 #'        y = mean(c(y_bottom, y_top_box)),
 #'        labels = label, cex = cex, font = font, xpd = NA)
 #' }
-#'
+#' 
 #' # par settings for multi-panel plot
 #' old_mfrow <- par(mfrow = c(1, 3))
 #' old_oma <- par(oma = c(4, 4, 2, 1))
 #' old_mar <- par(mar = c(0, 0, 2, 0))
-#'
+#' 
 #' # Panel 1
 #' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1",
 #'         by = "x2",
@@ -858,7 +912,7 @@
 #'         legend_labels = c("x2 = -1.3", "x2 = -0.2", "x2 = 1.5"))
 #' add_strip_label("x3 = 0.6")
 #' mtext("Response y", side = 2, outer = TRUE, line = 2.5)
-#'
+#' 
 #' # Panel 2
 #' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1",
 #'         by = "x2",
@@ -869,7 +923,7 @@
 #'         ci_polygon_col = c(2, 3, 4),
 #'         add_legend = FALSE)
 #' add_strip_label("x3 = 2.3")
-#'
+#' 
 #' # Panel 3
 #' easyViz(model = mod.lm.int, data = sim.data, predictor = "x1",
 #'         by = "x2",
@@ -881,12 +935,12 @@
 #'         add_legend = FALSE)
 #' add_strip_label("x3 = 4.5")
 #' mtext("Predictor x1", side = 1, outer = TRUE, line = 2.5)
-#'
+#' 
 #' # Restore original settings
 #' par(old_mfrow)
 #' par(old_oma)
 #' par(old_mar)
-#'
+#' 
 #' #-------------END OF EXAMPLES--------------
 #'
 #' @importFrom stats formula family glm gaussian plogis pnorm pcauchy predict quantile
@@ -903,6 +957,7 @@ easyViz <- function(model,
                     by = NULL,
                     by_breaks = NULL,
                     pred_type = "response",
+                    pred_transform = NULL,
                     pred_range_limit = TRUE,
                     pred_on_top = FALSE,
                     pred_resolution = 101,
@@ -911,7 +966,6 @@ easyViz <- function(model,
                     fix_values = NULL,
                     re_form = NULL,
                     rlm_vcov = "HC0",
-                    backtransform_response = NULL,
                     xlim = NULL,
                     ylim = NULL,
                     xlab = NULL,
@@ -988,7 +1042,7 @@ easyViz <- function(model,
 
   # --- Default ylab for coxph (depends on pred_type) ---
   if (isTRUE(prep$model_type$is_coxph) && !ylab_user) {
-    ylab <- if (identical(pred_type, "link")) "Log-hazard ratio" else "Hazard ratio"
+    ylab <- if (identical(pred_type, "link")) "Log hazard ratio" else "Hazard ratio"
   }
   
   # 2. Build newdata prediction grid
@@ -1049,7 +1103,7 @@ easyViz <- function(model,
     model = model,
     prep = prep,
     pred_type = pred_type,
-    backtransform_response = backtransform_response,
+    pred_transform = pred_transform,
     ci_level = ci_level
   )
 
@@ -1109,7 +1163,8 @@ easyViz <- function(model,
     new_data = new_data,
     preds = preds,
     ci_level = ci_level,
-    re_form = re_form
+    re_form = re_form,
+    prep = prep
   )
 
   invisible(pred.df)

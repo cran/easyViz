@@ -199,15 +199,23 @@ ez_get_link <- function(model) {
   # survival::coxph
   # linear predictor = log(relative hazard), so inverse-link is exp()
   if (inherits(model, "coxph")) return("log")
+  
   # betareg models (special handling)
   if (inherits(model, "betareg")) {
-    link <- tryCatch(
-      {
-        if (!is.null(model$link$mean)) model$link$mean$name
-        else model$link$mu$name
-      },
-      error = function(e) NA_character_
-    )
+    link <- tryCatch({
+      x <- NULL
+      # for standard beta models (dist = "beta") (typically when 0/1 values are absent)
+      if (!is.null(model$link$mean)) x <- model$link$mean 
+      # for extended-support models (dist = "xbetax"/"xbeta") (typically when 0/1 values are present)
+      else if (!is.null(model$link$mu)) x <- model$link$mu 
+      
+      if (is.null(x)) return(NA_character_)
+      if (is.list(x) && !is.null(x$name)) return(as.character(x$name))
+      if (is.character(x) && length(x) >= 1) return(x[1])
+      
+      NA_character_
+    }, error = function(e) NA_character_)
+    
     return(tolower(link))
   }
   
@@ -220,7 +228,7 @@ ez_get_link <- function(model) {
   # Models that always have identity link
   if (inherits(model, "lm")  &&
       !inherits(model, c("rlm", "glm", "negbin", "gam"))) return("identity")
-  if (inherits(model, c("rlm", "gls", "lme", "nls"))) return("identity")
+  if (inherits(model, c("rlm", "gls", "nls"))) return("identity")
   
   # Models storing link inside family(model)$link
   link <- tryCatch(family(model)$link, error = function(e) NULL)
@@ -261,16 +269,13 @@ ez_extract_grouping_vars <- function(model) {
   f <- tryCatch(stats::formula(model), error = function(e) NULL)
   if (is.null(f)) return(character(0))
   
-  # try lme4 parser if available (works for lme4 formulas and usually for glmmTMB too)
-  if (requireNamespace("lme4", quietly = TRUE)) {
-    bars <- tryCatch(ez_findbars(f), error = function(e) NULL)
-    if (!is.null(bars) && length(bars) > 0) {
-      grp <- unique(unlist(lapply(bars, function(b) all.vars(b[[3]]))))
-      return(grp)
-    }
+  bars <- tryCatch(ez_findbars(f), error = function(e) NULL)
+  if (!is.null(bars) && length(bars) > 0) {
+    grp <- unique(unlist(lapply(bars, function(b) all.vars(b[[3]]))))
+    return(grp)
   }
   
-  # fallback: cheap parse of deparsed formula
+  # fallback: cheap parse
   txt <- paste(deparse(f), collapse = " ")
   m <- gregexpr("\\|\\s*([[:alnum:]_.]+)", txt, perl = TRUE)
   hits <- regmatches(txt, m)[[1]]
@@ -292,14 +297,18 @@ ez_gam_re_smooths <- function(model) {
 
 ez_has_random_effects <- function(model) {
   # lme4 models always imply random effects structure
-  if (inherits(model, c("lmerMod", "glmerMod"))) return(TRUE)
+  if (requireNamespace("lme4", quietly = TRUE) &&
+      inherits(model, c("lmerMod", "glmerMod"))) return(TRUE)
   
   # glmmTMB: random effects only if formula contains | terms
   if (inherits(model, "glmmTMB")) {
     f <- tryCatch(stats::formula(model), error = function(e) NULL)
     if (is.null(f)) return(FALSE)
     bars <- tryCatch(ez_findbars(f), error = function(e) NULL)
-    return(!is.null(bars) && length(bars) > 0)
+    if (!is.null(bars) && length(bars) > 0) return(TRUE)
+    # last-resort fallback: detect "|" in deparsed formula
+    txt <- paste(deparse(f), collapse = " ")
+    return(grepl("\\|", txt))
   }
   
   # mgcv::gam: random effects if there are re smooths
@@ -325,7 +334,7 @@ ez_get_offset_vars <- function(model) {
   }
   
   # Offsets supplied as a separate argument: betareg(..., offset = log(exposure))
-  cl <- tryCatch(getCall(model), error = function(e) NULL)
+  cl <- tryCatch(stats::getCall(model), error = function(e) NULL)
   if (!is.null(cl) && !is.null(cl$offset)) {
     out <- union(out, all.vars(cl$offset))
   }
@@ -419,18 +428,23 @@ ez_message_conditioning <- function(model, prep, new_data, re_form,
       
       for (g in grp_vars) {
         
+        # Don't report grouping vars that are used as predictor/by (they vary by definition here)
+        if (g %in% c(predictor, by)) next
+        
+        # If the variable is present in new_data and varies, do NOT add a "held fixed" value
+        if (g %in% names(new_data) && length(unique(new_data[[g]])) > 1) next
+        
         # if already shown as fixed, skip
         if (any(grepl(paste0("^", g, " = "), fixed_pairs))) next
         
-        # determine the level being used
         g_val <- NULL
         
         if (!is.null(fv) && !is.null(fv[[g]])) {
           g_val <- fv[[g]]
         } else if (g %in% names(new_data) && length(unique(new_data[[g]])) == 1) {
           g_val <- unique(new_data[[g]])[1]
-        } else if (!is.null(prep$data) && g %in% names(prep$data)) {
-          # fall back to the most frequent (mode) level in the training/clean data
+        } else if (!is.null(prep$data) && g %in% names(prep$data) && !(g %in% names(new_data))) {
+          # Only fall back to the mode if the grouping variable is not in the prediction grid at all
           g_val <- ez_mode_factor(prep$data[[g]])
         }
         
